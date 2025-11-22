@@ -1,9 +1,8 @@
 {
   "name": "topprix-dz",
   "version": "1.0.0",
-  "description": "بوت أسعار المنتجات الجزائرية",
-  "main": "index.js",
   "type": "module",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js"
@@ -13,9 +12,11 @@
     "axios": "^1.6.0",
     "express": "^4.18.2",
     "dotenv": "^16.3.1",
-    "groq-sdk": "^0.9.0"
-  },
-  "keywords": ["bot", "algeria", "prices", "telegram"],
-  "author": "badreddingourari-tech",
-  "license": "MIT"
+    "groq-sdk": "^0.9.0",
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
+    "puppeteer": "^24.15.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
 }
