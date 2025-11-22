@@ -1,136 +1,259 @@
 import express from "express";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";
-import { Telegraf } from 'telegraf';
+import cors from "cors";
+import { bot } from './src/bots/mainBot.js';
+import { IntentDetector, buildContext } from './src/services/intentDetector.js';
 
-// === Load Environment Variables ===
+// === تحميل الإعدادات ===
 dotenv.config();
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// === Middleware ===
+app.use(cors());
 app.use(express.json());
 
-// === Groq Client ===
-const groqClient = new Groq({
-    apiKey: process.env.GROQ_API_KEY || "your_groq_key_here"
-});
+// === عميل Groq ===
+let groqClient;
+if (process.env.GROQ_API_KEY) {
+    groqClient = new Groq({
+        apiKey: process.env.GROQ_API_KEY,
+    });
+} else {
+    console.log("⚠️  GROQ_API_KEY غير موجود - ميزة AI غير مفعلة");
+}
 
-// === Telegram Bot ===
-const bot = new Telegraf(process.env.BOT_TOKEN || "your_bot_token_here");
+// === مسارات API ===
 
-// === API Routes ===
+// الصفحة الرئيسية
 app.get("/", (req, res) => {
-    res.json({ 
-        message: "🚀 TopPrix-DZ API is running!",
-        version: "1.0.0",
-        status: "active"
+    res.json({
+        status: "✅ Active",
+        project: "TopPrix-DZ",
+        message: "API is running successfully! 🚀",
+        endpoints: {
+            agent: "POST /agent - الدردشة مع AI",
+            search: "POST /api/search - البحث عن المنتجات",
+            health: "GET /health - حالة النظام"
+        }
     });
 });
 
-app.post("/search", async (req, res) => {
+// مسار الـ Agent المحسن
+app.post("/agent", async (req, res) => {
     try {
-        const { product } = req.body;
-        
+        // إذا لم يكن Groq مفعلاً
+        if (!groqClient) {
+            return res.json({
+                success: true,
+                response: "مرحباً! أنا بوت TopPrix-DZ. حالياً ميزة AI غير مفعلة. يمكنك استخدام /api/search للبحث عن المنتجات.",
+                context: {
+                    intent: "greeting",
+                    product: null,
+                    isPriceComparison: false
+                }
+            });
+        }
+
+        const userMessage = req.body.message;
+
+        if (!userMessage) {
+            return res.status(400).json({ error: "الرسالة مطلوبة" });
+        }
+
+        // استخدام intent detection محسن
+        const context = buildContext(userMessage);
+
         const response = await groqClient.chat.completions.create({
             model: "llama-3.1-8b-instant",
             messages: [
-                { 
-                    role: "user", 
-                    content: `اعطني أسعار ${product} في الأسواق الجزائرية مع أماكن البيع في تيك توك، فيسبوك، وانستقرام. قدم النتائج بتنسيق منظم للعرض في بوت تيليجرام.`
+                {
+                    role: "system",
+                    content: `أنت مساعد متخصص في الأسواق والأسعار الجزائرية. 
+
+معلومات السياق:
+- نية المستخدم: ${context.intent}
+- المنتج المطلوب: ${context.product || 'غير محدد'}
+- نوع الطلب: ${context.isPriceComparison ? 'مقارنة أسعار' : 'بحث عادي'}
+
+قم بمساعدة المستخدم في:
+• البحث عن أسعار المنتجات في الجزائر
+• مقارنة الأسعار بين المتاجر
+• تقديم نصائح شراء ذكية
+• الرد على استفسارات السوق الجزائري
+
+كن دقيقاً ومفيداً في إجاباتك.`
+                },
+                {
+                    role: "user",
+                    content: userMessage
                 }
             ],
+            temperature: 0.7,
+            max_tokens: 1024
         });
+
+        const aiResponse = response.choices[0]?.message?.content || "عذراً، لم أستطع معالجة طلبك.";
+
+        res.json({ 
+            success: true,
+            response: aiResponse,
+            context: {
+                intent: context.intent,
+                product: context.product,
+                isPriceComparison: context.isPriceComparison
+            }
+        });
+
+    } catch (error) {
+        console.error("Groq API error:", error);
+        res.status(500).json({ 
+            error: "فشل في معالجة الطلب",
+            details: error.message 
+        });
+    }
+});
+
+// مسار البحث عن المنتجات
+app.post('/api/search', async (req, res) => {
+    try {
+        const { query, userId } = req.body;
+
+        if (!query) {
+            return res.status(400).json({
+                success: false,
+                error: '⛔ يرجى إدخال كلمة البحث'
+            });
+        }
+
+        // استخدام intent detection لتحديد نوع البحث
+        const intent = IntentDetector.detect(query);
+        const product = IntentDetector.extractProduct(query);
+
+        console.log(`🔍 بحث جديد: "${query}" | النية: ${intent} | المنتج: ${product}`);
+
+        // محاكاة نتائج البحث (سيتم استبدالها بالخدمات الفعلية)
+        const mockResults = [
+            {
+                title: `${product || query} - سوق واد كنيس`,
+                price: "2500 دج",
+                source: "OuedKniss",
+                location: "الجزائر العاصمة",
+                rating: "4.2/5"
+            },
+            {
+                title: `${product || query} - متجر إلكتروني`,
+                price: "2700 دج",
+                source: "Jumia",
+                location: "عبر الإنترنت",
+                rating: "4.5/5"
+            },
+            {
+                title: `${product || query} - سوق محلي`,
+                price: "2300 دج",
+                source: "السوق المحلي",
+                location: "باب الواد",
+                rating: "4.0/5"
+            }
+        ];
 
         res.json({
             success: true,
+            query: query,
+            intent: intent,
             product: product,
-            prices: response.choices[0].message.content
+            results: mockResults,
+            totalResults: mockResults.length,
+            message: "سيتم تحسين النتائج قريباً مع إضافة المزيد من المصادر"
         });
+
     } catch (error) {
-        res.status(500).json({
+        console.error('Search error:', error);
+        res.status(500).json({ 
             success: false,
-            error: "فشل في جلب البيانات"
+            error: 'خطأ في الخادم الداخلي' 
         });
     }
 });
 
-// === Bot Commands ===
-bot.start((ctx) => {
-    ctx.replyWithMarkdown(`
-🛍️ *مرحباً بك في TopPrix-DZ* 🇩🇿
+// مسار الصحة
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: '✅ Active', 
+        project: 'TopPrix-DZ',
+        version: '2.0',
+        timestamp: new Date().toISOString(),
+        features: [
+            "AI Assistant with Groq",
+            "Intent Detection", 
+            "Product Search",
+            "Price Comparison"
+        ]
+    });
+});
 
-أنا بوت مساعد لأجد لك أفضل الأسعار في الجزائر من:
-• 📱 تيك توك
-• 👥 فيسبوك
-• 📸 انستقرام
+// معلومات النظام
+app.get('/info', (req, res) => {
+    res.json({
+        name: "TopPrix-DZ",
+        description: "بوت ذكي لمقارنة الأسعار في الجزائر",
+        version: "2.0",
+        author: "TopPrix Team",
+        endpoints: [
+            "GET / - الصفحة الرئيسية",
+            "POST /agent - الدردشة الذكية",
+            "POST /api/search - البحث عن المنتجات", 
+            "GET /health - حالة النظام",
+            "GET /info - معلومات المشروع"
+        ]
+    });
+});
 
-*كيفية الاستخدام:*
- فقط اكتب اسم المنتج الذي تبحث عنه!
-
-*أمثلة:*
-قهوة, لابتوب, هاتف, حليب, دراعة...
+// === تشغيل السيرفر ===
+app.listen(PORT, () => {
+    console.log(`
+╔══════════════════════════════════════╗
+║           🚀 TopPrix-DZ             ║
+║      Algerian Price Bot v2.0        ║
+║                                     ║
+║  🌐 http://localhost:${PORT}           ║
+║  ✅ Server is running successfully! ║
+╚══════════════════════════════════════╝
     `);
 });
 
-bot.help((ctx) => {
-    ctx.reply("💡 ببساطة اكتب اسم المنتج الذي تريد معرفة سعره!");
-});
-
-bot.on('text', async (ctx) => {
-    const productName = ctx.message.text.trim();
-    if (productName.startsWith('/')) return;
-
-    const waitingMsg = await ctx.reply(`🔍 _جاري البحث عن "${productName}"..._`, {
-        parse_mode: 'Markdown'
-    });
-
-    try {
-        // نتائج تجريبية للبدء
-        const sampleResults = `
-📦 *نتائج البحث عن "${productName}"*
-
-🏪 *من تيك توك:*
-🛒 متجر التقنية - 1500 دج ⭐⭐⭐⭐⭐
-🛒 سوق الجملة - 1600 دج ⭐⭐⭐⭐
-
-🏪 *من فيسبوك:*
-🛒 بائع معتمد - 1450 دج ⭐⭐⭐⭐⭐
-
-💎 *أفضل عرض:* 1450 دج
-📞 للاستفسار: 0550xxxxxx
-
-🕒 ${new Date().toLocaleString()}
-        `;
-
-        await ctx.reply(sampleResults, {
-            parse_mode: 'Markdown',
-            reply_to_message_id: ctx.message.message_id
-        });
-
-    } catch (error) {
-        await ctx.reply("❌ حدث خطأ في البحث، حاول مرة أخرى");
-    } finally {
-        try {
-            await ctx.deleteMessage(waitingMsg.message_id);
-        } catch (e) {
-            console.log("Cannot delete message");
-        }
-    }
-});
-
-// === Start Servers ===
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🌐 TopPrix-DZ API running on port ${PORT}`);
-});
-
-// Start bot only if token exists
-if (process.env.BOT_TOKEN && process.env.BOT_TOKEN !== "your_bot_token_here") {
+// === تشغيل بوت التلغرام ===
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (BOT_TOKEN && BOT_TOKEN !== "ضع توكين البوت هنا") {
     bot.launch().then(() => {
-        console.log("🤖 TopPrix-DZ Bot is running!");
+        console.log("🤖 بوت التلغرام يعمل بنجاح ✅");
+    }).catch(error => {
+        console.error("❌ فشل في تشغيل البوت:", error);
     });
 } else {
-    console.log("⚠️  Bot token not found - Running API only");
+    console.log("⚠️  لم يتم وضع التوكن - البوت غير نشط");
 }
 
-// Graceful shutdown
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// === إدارة إيقاف البوت ===
+process.once('SIGINT', () => {
+    console.log("🛑 إيقاف البوت...");
+    bot.stop('SIGINT');
+    process.exit(0);
+});
+
+process.once('SIGTERM', () => {
+    console.log("🛑 إيقاف البوت...");
+    bot.stop('SIGTERM');
+    process.exit(0);
+});
+
+// معالجة الأخطاء غير المتوقعة
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    process.exit(1);
+});
