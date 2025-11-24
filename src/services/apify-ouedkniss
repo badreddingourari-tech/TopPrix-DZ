@@ -1,0 +1,15 @@
+import axios from "axios";
+
+export async function scrapeOuedkniss(query) {
+    try {
+        const response = await axios.post(
+            `https://api.apify.com/v2/acts/YOUR_USERNAME~ouedkniss-scraper/run-sync?token=${process.env.APIFY_TOKEN}`,
+            { query }
+        );
+
+        return response.data;
+    } catch (err) {
+        console.error("APIFY ERROR:", err.message);
+        return null;
+    }
+}
