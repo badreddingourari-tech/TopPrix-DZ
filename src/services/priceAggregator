@@ -1,0 +1,79 @@
+const productUtils = require('../utils/productUtils');
+const safeScraper = require('../utils/safeScraper');
+
+class PriceAggregator {
+    constructor() {
+        this.sources = ['ouedkniss', 'google', 'local_stores'];
+    }
+
+    async aggregatePrices(productName, options = {}) {
+        const {
+            maxResults = 15,
+            includeImages = true,
+            sortBy = 'price'
+        } = options;
+
+        console.log(`🔍 تجميع الأسعار لـ: ${productName}`);
+
+        // جمع البيانات من مصادر متعددة
+        const allResults = await safeScraper.searchMultipleSources(productName, maxResults);
+
+        // استخدام utils الموجود لديك لتنظيف البيانات
+        const cleanedResults = productUtils.cleanProductData(allResults);
+
+        // تحليل وتجميع النتائج
+        const analyzedResults = this.analyzePrices(cleanedResults);
+
+        return {
+            product: productName,
+            totalResults: analyzedResults.length,
+            priceRange: this.getPriceRange(analyzedResults),
+            bestDeals: this.getBestDeals(analyzedResults),
+            allResults: analyzedResults
+        };
+    }
+
+    analyzePrices(products) {
+        return products.map(product => {
+            const priceAnalysis = this.analyzePrice(product.price);
+            return {
+                ...product,
+                priceValue: priceAnalysis.value,
+                currency: priceAnalysis.currency,
+                confidence: priceAnalysis.confidence
+            };
+        });
+    }
+
+    analyzePrice(priceText) {
+        // تحليل نص السعر لاستخراج القيمة الرقمية
+        const priceMatch = priceText.match(/(\d+[\d,.]*)/);
+        return {
+            value: priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : 0,
+            currency: 'DZD',
+            confidence: priceMatch ? 0.8 : 0.3
+        };
+    }
+
+    getPriceRange(products) {
+        const prices = products
+            .map(p => p.priceValue)
+            .filter(p => p > 0)
+            .sort((a, b) => a - b);
+
+        return {
+            min: prices[0] || 0,
+            max: prices[prices.length - 1] || 0,
+            average: prices.length ? prices.reduce((a, b) => a + b) / prices.length : 0
+        };
+    }
+
+    getBestDeals(products, count = 3) {
+        return products
+            .filter(p => p.priceValue > 0)
+            .sort((a, b) => a.priceValue - b.priceValue)
+            .slice(0, count);
+    }
+}
+
+module.exports = new PriceAggregator();
