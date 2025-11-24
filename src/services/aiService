@@ -1,0 +1,37 @@
+import Groq from "groq-sdk";
+
+const groqClient = new Groq({
+    apiKey: process.env.GROQ_API_KEY
+});
+
+export class AIService {
+    static async getSmartResponse(userMessage, userName = "المستخدم") {
+        try {
+            console.log("🔄 جاري الاتصال بـ Groq AI...");
+
+            const response = await groqClient.chat.completions.create({
+                model: "llama-3.1-8b-instant",
+                messages: [
+                    {
+                        role: "system",
+                        content: "أنت بوت أسواق جزائرية ذكي. ساعد المستخدم في البحث عن المنتجات والأسعار أو أي استفسار آخر."
+                    },
+                    {
+                        role: "user", 
+                        content: `${userName} يقول: "${userMessage}"`
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 500
+            });
+
+            const aiResponse = response.choices[0]?.message?.content;
+            console.log("✅ تم الحصول على رد الذكاء الاصطناعي");
+            return aiResponse;
+
+        } catch (error) {
+            console.error("❌ خطأ في الذكاء الاصطناعي:", error.message);
+            return "أهلاً! أنا بوت TopPrix DZ. كيف يمكنني مساعدتك؟";
+        }
+    }
+}
