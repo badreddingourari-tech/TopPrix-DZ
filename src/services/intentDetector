@@ -1,0 +1,88 @@
+// نظام اكتشاف النوايا المتقدم والمحدث
+class IntentDetector {
+    static detect(message) {
+        const text = message.toLowerCase().trim();
+
+        // نماذج الكلمات المفتاحية المحدثة
+        const intents = {
+            'product_search': [
+                'سعر', 'ثمن', 'كم سعر', 'كم ثمن', 'تكلفة', 'بكم',
+                'ابغى', 'عايز', 'نبي', 'اريد', 'أحتاج',
+                'سكر', 'ثورة', 'لايوب', 'هقاء', 'حليب', 'زيت', 'ارز', 
+                'مكرونة', 'دقيق', 'قهوة', 'شاي', 'مواد', 'بقالة'
+            ],
+            'price_comparison': [
+                'قارن', 'مقارنة', 'ارخص', 'اغلى', 'افضل سعر',
+                'فين ارخص', 'وين ارخص', 'أرخص مكان'
+            ],
+            'greeting': [
+                'مرحبا', 'اهلا', 'سلام', 'السلام', 'hello', 'hi', 
+                'صباح', 'مساء', 'نهارك', 'كيفك'
+            ],
+            'help': ['مساعدة', 'مساعدة', 'help', 'بدي مساعدة', 'شنو تقدر'],
+            'bye': ['مع السلامة', 'وداعا', 'الى اللقاء', 'bye', 'سلام']
+        };
+
+        // البحث عن النية
+        for (const [intent, keywords] of Object.entries(intents)) {
+            if (keywords.some(keyword => text.includes(keyword))) {
+                return intent;
+            }
+        }
+
+        // إذا لم يتم التعرف، نعتبره بحث عادي
+        return 'general_search';
+    }
+
+    // دالة جديدة لاستخراج المنتج من الرسالة
+    static extractProduct(message) {
+        const products = [
+            'سكر', 'ثورة', 'لايوب', 'هقاء', 'حليب', 'زيت', 'ارز', 
+            'مكرونة', 'دقيق', 'قهوة', 'شاي', 'مواد غذائية'
+        ];
+
+        const found = products.find(product => 
+            message.toLowerCase().includes(product.toLowerCase())
+        );
+
+        return found || null;
+    }
+
+    // تحديد إذا كان المستخدم يريد مقارنة أسعار
+    static isPriceComparison(message) {
+        const comparisonWords = ['قارن', 'مقارنة', 'ارخص', 'اغلى', 'افضل سعر'];
+        return comparisonWords.some(word => 
+            message.toLowerCase().includes(word)
+        );
+    }
+}
+
+// بناء السياق للمستخدم (محدث)
+function buildContext(message, userHistory = []) {
+    const intent = IntentDetector.detect(message);
+    const product = IntentDetector.extractProduct(message);
+
+    return {
+        intent: intent,
+        product: product,
+        isPriceComparison: IntentDetector.isPriceComparison(message),
+        isFirstMessage: userHistory.length === 0,
+        lastIntent: userHistory[userHistory.length - 1]?.intent,
+        messageLength: message.length,
+        timestamp: new Date().toISOString()
+    };
+}
+
+// التحقق من المصطلحات الجزائرية (محسن)
+function hasAlgerianTerms(text) {
+    const algerianTerms = [
+        'نحور', 'رابط', 'بلاصمة', 'إداري', 'أحرار', 'جزء',
+        'قرية', 'بلدية', 'ولاية', 'دائرة', 'بلعباس'
+    ];
+    return algerianTerms.some(term => 
+        text.toLowerCase().includes(term.toLowerCase())
+    );
+}
+
+// التصدير
+export { IntentDetector, buildContext, hasAlgerianTerms };
