@@ -1,0 +1,99 @@
+const axios = require('axios');
+const cheerio = require('cheerio');
+
+class SafeScraper {
+    constructor() {
+        this.userAgents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        ];
+    }
+
+    getRandomHeaders() {
+        return {
+            'User-Agent': this.userAgents[Math.floor(Math.random() * this.userAgents.length)],
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive'
+        };
+    }
+
+    async safeRequest(url, options = {}) {
+        try {
+            const response = await axios.get(url, {
+                headers: this.getRandomHeaders(),
+                timeout: 10000,
+                ...options
+            });
+
+            // تأخير عشوائي لمحاكاة السلوك البشري
+            await this.randomDelay(1000, 3000);
+
+            return response;
+        } catch (error) {
+            console.error(`Request failed for ${url}:`, error.message);
+            throw error;
+        }
+    }
+
+    async randomDelay(min, max) {
+        const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+        return new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    // دمج مع ouedknissService الموجود لديك
+    async searchMultipleSources(product, maxResults = 10) {
+        const results = [];
+
+        try {
+            // استخدام service واد كنيس الموجود
+            const ouedknissService = require('../services/ouedknissService');
+            const ouedknissResults = await ouedknissService.searchProducts(product);
+            results.push(...ouedknissResults);
+        } catch (error) {
+            console.error('OuedKniss service error:', error);
+        }
+
+        // البحث من جوجل (بديل آمن)
+        try {
+            const googleResults = await this.searchGoogle(product);
+            results.push(...googleResults);
+        } catch (error) {
+            console.error('Google search error:', error);
+        }
+
+        return results.slice(0, maxResults);
+    }
+
+    async searchGoogle(product) {
+        try {
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(product + ' سعر في الجزائر')}`;
+            const response = await this.safeRequest(searchUrl);
+            const $ = cheerio.load(response.data);
+
+            const results = [];
+
+            // استخراج النتائج من صفحة جوجل
+            $('.g').slice(0, 5).each((i, element) => {
+                const title = $(element).find('h3').text();
+                const link = $(element).find('a').attr('href');
+
+                if (title && link) {
+                    results.push({
+                        title: title.trim(),
+                        price: 'يحدد لاحقاً',
+                        source: 'Google Search',
+                        link: link
+                    });
+                }
+            });
+
+            return results;
+        } catch (error) {
+            return [];
+        }
+    }
+}
+
+module.exports = new SafeScraper();
