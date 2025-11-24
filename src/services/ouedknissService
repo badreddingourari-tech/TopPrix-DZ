@@ -1,0 +1,71 @@
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+
+export class OuedknissService {
+    static async searchProducts(productName) {
+        try {
+            console.log(`🔍 جاري البحث في Ouedkniss عن: ${productName}`);
+
+            // البحث في Ouedkniss
+            const response = await axios.get(`https://www.ouedkniss.com/resultat/?text=${encodeURIComponent(productName)}`, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout: 10000
+            });
+
+            const $ = cheerio.load(response.data);
+            const results = [];
+
+            // استخراج المنتجات (هيكل Ouedkniss الحالي)
+            $('.annonce_list, .product-item, [class*="annonce"]').each((index, element) => {
+                if (index >= 5) return false; // أول 5 نتائج فقط
+
+                const title = $(element).find('.titre, .title, h2, h3').first().text().trim();
+                const price = $(element).find('.prix, .price, [class*="prix"]').first().text().trim();
+                const location = $(element).find('.lieu, .location, [class*="lieu"]').first().text().trim();
+                const link = $(element).find('a').first().attr('href');
+
+                if (title && price) {
+                    results.push({
+                        title,
+                        price: price.replace(/\s+/g, ' '),
+                        location: location || 'غير محدد',
+                        link: link ? `https://www.ouedkniss.com${link.startsWith('/') ? link : '/' + link}` : null,
+                        source: 'Ouedkniss'
+                    });
+                }
+            });
+
+            console.log(`✅ وجدنا ${results.length} نتيجة من Ouedkniss`);
+            return results;
+
+        } catch (error) {
+            console.error('❌ خطأ في البحث من Ouedkniss:', error.message);
+            return [];
+        }
+    }
+
+    static async getProductDetails(productUrl) {
+        try {
+            const response = await axios.get(productUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+
+            const $ = cheerio.load(response.data);
+
+            return {
+                title: $('h1').first().text().trim(),
+                price: $('.prix, .price').first().text().trim(),
+                description: $('.description, .desc').first().text().trim().substring(0, 200) + '...',
+                seller: $('.vendeur, .seller').first().text().trim(),
+                phone: $('.telephone, .phone').first().text().trim() || 'غير متوفر'
+            };
+        } catch (error) {
+            console.error('خطأ في جلب التفاصيل:', error);
+            return null;
+        }
+    }
+}
