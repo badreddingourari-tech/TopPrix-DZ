@@ -1,0 +1,68 @@
+// أدوات المنتجات وimport { OuedknissService } from './ouedknissService.js';
+
+export async function smartProductSearch(productName, intent) {
+    try {
+        console.log(`🛍️ بدء البحث الحقيقي عن: ${productName}`);
+
+        // البحث في Ouedkniss (حقيقي)
+        const ouedknissResults = await OuedknissService.searchProducts(productName);
+
+        if (ouedknissResults.length > 0) {
+            return formatOuedknissResults(ouedknissResults, productName);
+        }
+
+        // إذا لم توجد نتائج حقيقية
+        return `🔍 لم أجد نتائج حقيقية لـ "${productName}" في Ouedkniss حالياً.\n\nيمكنك البحث مباشرة:\nhttps://www.ouedkniss.com/resultat/?text=${encodeURIComponent(productName)}`;
+
+    } catch (error) {
+        console.error("Search error:", error);
+        return `❌ حدث خطأ في البحث عن "${productName}". جرب الذكاء الاصطناعي أو ابحث مباشرة في Ouedkniss.`;
+    }
+}
+
+function formatOuedknissResults(results, productName) {
+    let message = `🛍️ *نتائج حقيقية من Ouedkniss لـ ${productName}*\n\n`;
+
+    results.forEach((product, index) => {
+        message += `*${index + 1}. ${product.title}*\n`;
+        message += `💵 ${product.price}\n`;
+        message += `📍 ${product.location}\n`;
+        if (product.link) {
+            message += `🔗 [رابط المنتج](${product.link})\n`;
+        }
+        message += `\n`;
+    });
+
+    message += `---\n`;
+    message += `🔍 *بحث مباشر:* https://www.ouedkniss.com/resultat/?text=${encodeURIComponent(productName)}`;
+
+    return message;
+}البحث
+export async function smartProductSearch(productName, intent) {
+    try {
+        // محاكاة البحث في قواعد البيانات أو APIs
+        const mockResults = [
+            { name: "سكر", price: "180 دج", market: "فيسيرك" },
+            { name: "قهوة", price: "450 دج", market: "انستقرام" },
+            { name: "زيت", price: "320 دج", market: "فيسيرك" }
+        ];
+
+        const foundProduct = mockResults.find(p => 
+            productName.includes(p.name.toLowerCase())
+        );
+
+        if (foundProduct) {
+            return `🛍️ *${foundProduct.name}*
+💵 السعر: ${foundProduct.price}
+🏪 المتجر: ${foundProduct.market}
+
+🔍 ابحث في: https://fisec.com`;
+        } else {
+            return `لم أجد "${productName}" في قاعدة البيانات، لكن يمكنك البحث مباشرة:
+https://fisec.com/search?q=${encodeURIComponent(productName)}`;
+        }
+    } catch (error) {
+        console.error("Search error:", error);
+        return "❌ حدث خطأ في البحث، يرجى المحاولة لاحقاً";
+    }
+}
